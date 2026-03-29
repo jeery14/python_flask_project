@@ -1,37 +1,51 @@
-from flask import Flask, render_template, request
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, request, redirect
+import sqlite3
 
 app = Flask(__name__)
 
-# Database Config
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-db = SQLAlchemy(app)
+# Create DB
+def init_db():
+    conn = sqlite3.connect('database.db')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            price TEXT
+        )
+    ''')
+    conn.close()
 
-# Model Example
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+init_db()
 
-# Create tables
-with app.app_context():
-    db.create_all()
-
-# Home Route
+# Home page
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# About Route
-@app.route('/about')
-def about():
-    return render_template('about.html')
+# Add product page
+@app.route('/add', methods=['GET', 'POST'])
+def add_product():
+    if request.method == 'POST':
+        name = request.form['name']
+        price = request.form['price']
 
-# Form Route
-@app.route('/submit', methods=['POST'])
-def submit():
-    name = request.form.get('name')
-    return f"<h2>Hello, {name}! Form submitted successfully. ✅</h2>"
+        conn = sqlite3.connect('database.db')
+        conn.execute("INSERT INTO products (name, price) VALUES (?, ?)", (name, price))
+        conn.commit()
+        conn.close()
+
+        return redirect('/products')
+
+    return render_template('add_product.html')
+
+# View products
+@app.route('/products')
+def view_products():
+    conn = sqlite3.connect('database.db')
+    products = conn.execute("SELECT * FROM products").fetchall()
+    conn.close()
+
+    return render_template('view_products.html', products=products)
 
 if __name__ == '__main__':
     app.run(debug=True)
